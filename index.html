@@ -344,8 +344,9 @@ function renderVibeRow(vibe) {
   const strip = document.createElement("div");
   strip.className = "card-strip";
 
-  const samples = vibe.sample_usernames || [];
-  samples.forEach(u => strip.appendChild(makeCard(u)));
+  // Use samples array (has snapshot_url) if available, else fall back to sample_usernames
+  const samples = vibe.samples || (vibe.sample_usernames || []).map(u => ({ username: u, snapshot_url: null }));
+  samples.forEach(s => strip.appendChild(makeCard(s.username, s.snapshot_url)));
   modelLoadOffset[vibe.id] = samples.length;
 
   if (vibe.model_count > samples.length) {
@@ -449,6 +450,10 @@ init();
 </script>
 </body>
 </html>
+
+
+
+
 
 
 
