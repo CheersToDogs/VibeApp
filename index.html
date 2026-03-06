@@ -1,143 +1,447 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Vibe</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0a0a0a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, sans-serif; height: 100vh; overflow: hidden; }
-    #app { height: 100vh; display: flex; flex-direction: column; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Header */
-    #header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
-    #header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
-    #header h1 span { color: #a78bfa; }
+    :root {
+      --purple: #a78bfa;
+      --purple-dim: #7c3aed44;
+      --bg: #080808;
+      --surface: #111;
+      --text: #fff;
+      --muted: #666;
+      --card-w: 152px;
+      --card-h: 210px;
+      --header-h: 52px;
+      --filter-h: 40px;
+    }
 
-    /* Vibe rows — horizontal scroll */
-    #vibe-feed { flex: 1; overflow-y: auto; padding: 8px 0; }
-    .vibe-row { margin-bottom: 20px; }
-    .vibe-row-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
-                      letter-spacing: 0.08em; color: #888; padding: 0 16px 8px; }
-    .vibe-row-strip { display: flex; gap: 8px; padding: 0 16px; overflow-x: auto;
-                      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
-    .vibe-row-strip::-webkit-scrollbar { display: none; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100dvh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
 
-    /* Stream card */
-    .stream-card { flex: 0 0 160px; height: 220px; border-radius: 12px; overflow: hidden;
-                   position: relative; scroll-snap-align: start; cursor: pointer;
-                   background: #1a1a1a; }
-    .stream-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .stream-card-meta { position: absolute; bottom: 0; left: 0; right: 0;
-                        padding: 8px 10px; background: linear-gradient(transparent, rgba(0,0,0,0.8));
-                        font-size: 0.7rem; }
-    .stream-card-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stream-card-viewers { color: #a78bfa; }
+    /* ── HEADER ── */
+    #header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: var(--header-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      background: linear-gradient(var(--bg) 70%, transparent);
+    }
+    #logo { font-size: 1.5rem; font-weight: 800; letter-spacing: -1px; }
+    #logo span { color: var(--purple); }
+    #header-right { display: flex; align-items: center; gap: 10px; }
+    #live-count {
+      font-size: 0.65rem; font-weight: 700; color: var(--purple);
+      background: var(--purple-dim); border-radius: 99px;
+      padding: 3px 8px; letter-spacing: 0.04em;
+    }
 
-    /* Loading */
-    .loading { display: flex; align-items: center; justify-content: center;
-               height: 100%; color: #555; font-size: 0.9rem; }
+    /* ── FILTER PILL ROW ── */
+    #filter-bar {
+      position: fixed; top: var(--header-h); left: 0; right: 0; z-index: 99;
+      height: var(--filter-h);
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 12px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      background: linear-gradient(var(--bg) 60%, transparent);
+    }
+    #filter-bar::-webkit-scrollbar { display: none; }
+    .filter-pill {
+      flex: 0 0 auto; scroll-snap-align: start;
+      padding: 5px 12px; border-radius: 99px; border: 1px solid #2a2a2a;
+      font-size: 0.7rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+      background: #111; color: var(--muted);
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .filter-pill.active {
+      background: var(--purple-dim); border-color: var(--purple);
+      color: var(--purple);
+    }
 
-    /* Error */
-    .error-msg { color: #f87171; padding: 16px; font-size: 0.85rem; }
+    /* ── MAIN FEED ── */
+    #feed {
+      position: fixed;
+      top: calc(var(--header-h) + var(--filter-h));
+      left: 0; right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    #feed::-webkit-scrollbar { display: none; }
+
+    /* ── VIBE ROW (one snap stop) ── */
+    .vibe-row {
+      scroll-snap-align: start;
+      height: calc(100dvh - var(--header-h) - var(--filter-h));
+      display: flex; flex-direction: column;
+      padding: 12px 0 4px;
+    }
+    .vibe-row.hidden { display: none; }
+
+    .vibe-label {
+      padding: 0 16px 10px;
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .vibe-label-name {
+      font-size: 1rem; font-weight: 700; letter-spacing: -0.3px;
+    }
+    .vibe-label-desc {
+      font-size: 0.68rem; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 200px;
+    }
+    .vibe-label-count {
+      margin-left: auto; font-size: 0.65rem; color: #444; flex-shrink: 0;
+    }
+
+    /* ── CARD STRIP ── */
+    .card-strip {
+      flex: 1;
+      display: flex; gap: 8px;
+      padding: 0 16px 8px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      align-items: flex-start;
+    }
+    .card-strip::-webkit-scrollbar { display: none; }
+
+    /* ── STREAM CARD ── */
+    .stream-card {
+      flex: 0 0 var(--card-w);
+      height: var(--card-h);
+      border-radius: 14px; overflow: hidden;
+      position: relative; scroll-snap-align: start;
+      cursor: pointer; background: #1a1a1a;
+      transition: transform 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .stream-card:active { transform: scale(0.96); }
+
+    .stream-card img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      border-radius: 14px;
+    }
+    .stream-card-overlay {
+      position: absolute; inset: 0; border-radius: 14px;
+      background: linear-gradient(to bottom, transparent 45%, rgba(0,0,0,0.85) 100%);
+      pointer-events: none;
+    }
+    .stream-card-meta {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 8px 9px 9px;
+    }
+    .stream-card-name {
+      font-size: 0.72rem; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+    .stream-card-viewers {
+      font-size: 0.62rem; color: var(--purple); font-weight: 600;
+    }
+    .stream-card-live-dot {
+      position: absolute; top: 8px; left: 9px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 6px 2px #ef444466;
+    }
+    /* shimmer placeholder */
+    .stream-card.loading {
+      background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── LOAD MORE CARD ── */
+    .load-more-card {
+      flex: 0 0 72px; height: var(--card-h);
+      border-radius: 14px; border: 1px dashed #2a2a2a;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 6px; cursor: pointer;
+      scroll-snap-align: start; color: var(--muted);
+      font-size: 0.65rem; font-weight: 600; text-align: center;
+      transition: border-color 0.15s;
+    }
+    .load-more-card:hover { border-color: var(--purple); color: var(--purple); }
+    .load-more-card svg { opacity: 0.5; }
+
+    /* ── EMPTY / ERROR ── */
+    #empty {
+      display: none; height: 100%; align-items: center;
+      justify-content: center; flex-direction: column; gap: 10px;
+      color: var(--muted); font-size: 0.85rem; text-align: center;
+      padding: 32px;
+    }
+
+    /* ── SPINNER ── */
+    #spinner {
+      position: fixed; inset: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+    }
+    .spin {
+      width: 32px; height: 32px;
+      border: 2px solid #222; border-top-color: var(--purple);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── AFFILIATE RIBBON ── */
+    .ribbon {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,0.6); border-radius: 6px;
+      padding: 2px 5px; font-size: 0.55rem; color: #777;
+      letter-spacing: 0.04em; pointer-events: none;
+    }
   </style>
 </head>
 <body>
-<div id="app">
-  <div id="header">
-    <h1>vi<span>be</span></h1>
-    <span id="status" style="font-size:0.7rem;color:#555;">loading...</span>
-  </div>
-  <div id="vibe-feed">
-    <div class="loading">loading vibes...</div>
+
+<div id="spinner"><div class="spin"></div></div>
+
+<div id="header">
+  <div id="logo">vi<span>be</span></div>
+  <div id="header-right">
+    <span id="live-count">…</span>
   </div>
 </div>
 
+<div id="filter-bar">
+  <div class="filter-pill active" data-vibe="all">All</div>
+</div>
+
+<div id="feed"></div>
+
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API_BASE    = "https://identifier-stocks-answer-adaptation.trycloudflare.com"; // CF tunnel
-const API_KEY     = "";   // set before use
-const SC_API      = "https://go.stripchat.com/api/models";
+const API_BASE = "https://identifier-stocks-answer-adaptation.trycloudflare.com";
+const API_KEY  = "0a65ca75cea9a319531899ef2ea71a33b1add8e3feda83c955294e6094266b9c";
+const SC_API   = "https://go.stripchat.com/api/models";
+const CAMPAIGN = "vibeapp";
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let vibes    = [];
-let scModels = {};  // username -> model data from Stripchat
+let vibes      = [];
+let scModels   = {};   // username -> stripchat model object
+let activeVibe = "all";
+let modelLoadOffset = {}; // vibeId -> offset for pagination
 
-// ── API HELPERS ───────────────────────────────────────────────────────────────
-async function apiFetch(path) {
-  const r = await fetch(API_BASE + path, { headers: { "X-API-Key": API_KEY } });
-  if (!r.ok) throw new Error(`API ${r.status}: ${path}`);
-  return r.json();
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+const api = (path) =>
+  fetch(API_BASE + path, { headers: { "X-API-Key": API_KEY } }).then(r => {
+    if (!r.ok) throw new Error(`API ${r.status}`);
+    return r.json();
+  });
+
+function affiliateUrl(username) {
+  return `https://stripchat.com/${username}?campaign=${CAMPAIGN}&track=default&promo_id=&target=_blank`;
 }
 
-async function fetchStripchatModels(usernames) {
-  // Stripchat doesn't support multi-username lookup — fetch top models and match
-  const r = await fetch(`${SC_API}?limit=200&sortBy=viewersCount`);
-  if (!r.ok) return;
-  const data = await r.json();
-  const models = (data.models || []).filter(m => m.status === "public");
-  models.forEach(m => { scModels[m.username] = m; });
+// ── STRIPCHAT LIVE FETCH ───────────────────────────────────────────────────────
+async function fetchLiveModels() {
+  try {
+    const r = await fetch(`${SC_API}?limit=200&sortBy=viewersCount`);
+    if (!r.ok) return;
+    const data = await r.json();
+    const models = (data.models || []).filter(m => m.status === "public");
+    scModels = {};
+    models.forEach(m => { scModels[m.username] = m; });
+    return models.length;
+  } catch(e) {
+    console.warn("SC fetch failed", e);
+    return 0;
+  }
 }
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
-function renderCard(username) {
-  const m = scModels[username] || {};
-  const snap = m.snapshotUrl || "";
-  const viewers = m.viewersCount || "";
+// ── RENDER CARD ───────────────────────────────────────────────────────────────
+function makeCard(username) {
+  const m    = scModels[username] || {};
+  const snap = m.snapshotUrl || m.widgetPreviewUrl || "";
+  const viewers = m.viewersCount ? `👁 ${m.viewersCount.toLocaleString()}` : "";
+  const isLive = !!scModels[username];
+
   const card = document.createElement("div");
-  card.className = "stream-card";
-  card.innerHTML = `
-    ${snap ? `<img src="${snap}" loading="lazy" alt="${username}">` : ""}
+  card.className = "stream-card" + (snap ? "" : " loading");
+  card.setAttribute("data-username", username);
+
+  if (snap) {
+    const img = document.createElement("img");
+    img.src = snap;
+    img.alt = username;
+    img.loading = "lazy";
+    img.onerror = () => { card.style.background = "#1a1a1a"; };
+    card.appendChild(img);
+  }
+
+  card.innerHTML += `
+    <div class="stream-card-overlay"></div>
+    ${isLive ? '<div class="stream-card-live-dot"></div>' : ""}
     <div class="stream-card-meta">
       <div class="stream-card-name">${username}</div>
-      ${viewers ? `<div class="stream-card-viewers">👁 ${viewers}</div>` : ""}
+      ${viewers ? `<div class="stream-card-viewers">${viewers}</div>` : ""}
     </div>
   `;
+
   card.addEventListener("click", () => {
-    const url = m.pageUrl || `https://stripchat.com/${username}`;
-    window.open(url, "_blank");
+    window.open(affiliateUrl(username), "_blank");
   });
   return card;
 }
 
+function makeLoadMoreCard(vibeId, strip, label) {
+  const btn = document.createElement("div");
+  btn.className = "load-more-card";
+  btn.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
+    more
+  `;
+  btn.addEventListener("click", async () => {
+    btn.remove();
+    const offset = modelLoadOffset[vibeId] || 0;
+    try {
+      const data = await api(`/vibes/${vibeId}/models?limit=20&offset=${offset}`);
+      modelLoadOffset[vibeId] = offset + 20;
+      const usernames = (data.models || []).map(m => m.username);
+      usernames.forEach(u => strip.insertBefore(makeCard(u), strip.querySelector(".load-more-card")));
+      if (usernames.length === 20) strip.appendChild(makeLoadMoreCard(vibeId, strip, label));
+    } catch(e) { console.warn("load more failed", e); }
+  });
+  return btn;
+}
+
+// ── RENDER VIBE ROW ───────────────────────────────────────────────────────────
 function renderVibeRow(vibe) {
   const row = document.createElement("div");
   row.className = "vibe-row";
-  row.innerHTML = `<div class="vibe-row-label">${vibe.name} <span style="color:#444">${vibe.model_count}</span></div>`;
+  row.setAttribute("data-vibe-id", vibe.id);
+
+  row.innerHTML = `
+    <div class="vibe-label">
+      <span class="vibe-label-name">${vibe.name}</span>
+      <span class="vibe-label-desc">${vibe.description}</span>
+      <span class="vibe-label-count">${vibe.model_count}</span>
+    </div>
+  `;
+
   const strip = document.createElement("div");
-  strip.className = "vibe-row-strip";
-  (vibe.sample_usernames || []).forEach(u => strip.appendChild(renderCard(u)));
+  strip.className = "card-strip";
+
+  const samples = vibe.sample_usernames || [];
+  samples.forEach(u => strip.appendChild(makeCard(u)));
+  modelLoadOffset[vibe.id] = samples.length;
+
+  if (vibe.model_count > samples.length) {
+    strip.appendChild(makeLoadMoreCard(vibe.id, strip, vibe.name));
+  }
+
   row.appendChild(strip);
   return row;
 }
 
-async function loadMore(vibeId, strip, offset) {
-  try {
-    const data = await apiFetch(`/vibes/${vibeId}/models?limit=20&offset=${offset}`);
-    data.models.forEach(m => strip.appendChild(renderCard(m.username)));
-  } catch(e) { console.warn("loadMore failed", e); }
+// ── FILTER LOGIC ──────────────────────────────────────────────────────────────
+function applyFilter(vibeId) {
+  activeVibe = vibeId;
+  document.querySelectorAll(".filter-pill").forEach(p => {
+    p.classList.toggle("active", p.dataset.vibe === String(vibeId));
+  });
+  document.querySelectorAll(".vibe-row").forEach(row => {
+    const id = row.getAttribute("data-vibe-id");
+    row.classList.toggle("hidden", vibeId !== "all" && id !== String(vibeId));
+  });
+  // scroll feed to top
+  document.getElementById("feed").scrollTop = 0;
+}
+
+// ── BUILD FILTER PILLS ─────────────────────────────────────────────────────────
+function buildFilterBar(vibes) {
+  const bar = document.getElementById("filter-bar");
+  vibes.forEach(v => {
+    const pill = document.createElement("div");
+    pill.className = "filter-pill";
+    pill.dataset.vibe = v.id;
+    pill.textContent = v.name;
+    pill.addEventListener("click", () => applyFilter(v.id));
+    bar.appendChild(pill);
+  });
+  // wire "All"
+  bar.querySelector('[data-vibe="all"]').addEventListener("click", () => applyFilter("all"));
+}
+
+// ── REFRESH LIVE DATA ──────────────────────────────────────────────────────────
+async function refreshLive() {
+  const count = await fetchLiveModels();
+  document.getElementById("live-count").textContent = count ? `${count} live` : "live";
+  // Update cards that are currently rendered
+  document.querySelectorAll(".stream-card").forEach(card => {
+    const username = card.getAttribute("data-username");
+    if (!username) return;
+    const m = scModels[username];
+    if (!m) return;
+    // Update snapshot if card is still a loading skeleton
+    if (card.classList.contains("loading") && m.snapshotUrl) {
+      card.classList.remove("loading");
+      const img = document.createElement("img");
+      img.src = m.snapshotUrl;
+      img.alt = username;
+      img.loading = "lazy";
+      card.prepend(img);
+    }
+    // Update viewer count
+    const vc = card.querySelector(".stream-card-viewers");
+    if (vc && m.viewersCount) vc.textContent = `👁 ${m.viewersCount.toLocaleString()}`;
+  });
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function init() {
-  const feed   = document.getElementById("vibe-feed");
-  const status = document.getElementById("status");
-
   try {
-    // Load vibes + first batch of Stripchat data in parallel
-    const vibesData = await apiFetch("/vibes");
+    // Parallel: fetch vibes from our API + live models from Stripchat
+    const [vibesData, liveCount] = await Promise.all([
+      api("/vibes"),
+      fetchLiveModels()
+    ]);
+
     vibes = vibesData.vibes || [];
 
-    // Collect all sample usernames for Stripchat pre-fetch
-    const allUsernames = vibes.flatMap(v => v.sample_usernames || []);
-    await fetchStripchatModels(allUsernames);
-
-    feed.innerHTML = "";
+    const feed = document.getElementById("feed");
     vibes.forEach(v => feed.appendChild(renderVibeRow(v)));
-    status.textContent = `${vibes.length} vibes`;
+
+    buildFilterBar(vibes);
+
+    const liveEl = document.getElementById("live-count");
+    liveEl.textContent = liveCount ? `${liveCount} live` : `${vibes.length} vibes`;
+
+    // Done — hide spinner
+    document.getElementById("spinner").style.display = "none";
+
+    // Refresh live data every 60s
+    setInterval(refreshLive, 60_000);
+
   } catch(e) {
-    feed.innerHTML = `<div class="error-msg">Error: ${e.message}<br>Check API_KEY and API_BASE config.</div>`;
-    status.textContent = "error";
+    document.getElementById("spinner").style.display = "none";
+    document.getElementById("feed").innerHTML =
+      `<div style="padding:32px;color:#f87171;font-size:0.85rem">
+        Failed to load: ${e.message}<br><br>
+        <span style="color:#555">Check API_BASE and API_KEY config.</span>
+      </div>`;
   }
 }
 
