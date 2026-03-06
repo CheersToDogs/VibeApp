@@ -230,8 +230,8 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
-const API_BASE = "https://identifier-stocks-answer-adaptation.trycloudflare.com";
-const API_KEY  = "";  // set via CF Pages env or local config
+const API_BASE = "";  // proxied via /api/* � no key needed
+const API_KEY  = "";   // injected server-side by CF Worker
 const SC_API   = "https://go.stripchat.com/api/models";
 const CAMPAIGN = "vibeapp";
 
@@ -243,7 +243,7 @@ let modelLoadOffset = {}; // vibeId -> offset for pagination
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 const api = (path) =>
-  fetch(API_BASE + path, { headers: { "X-API-Key": API_KEY } }).then(r => {
+  fetch("/api" + path).then(r => {
     if (!r.ok) throw new Error(`API ${r.status}`);
     return r.json();
   });
@@ -449,3 +449,8 @@ init();
 </script>
 </body>
 </html>
+
+
+
+
+
